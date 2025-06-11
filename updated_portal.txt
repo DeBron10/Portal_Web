@@ -1,0 +1,66 @@
+SessionService.asmx.cs:
+using System;
+using System.Web.Services;
+using MySql.Data.MySqlClient;
+using System.Configuration;
+
+[WebService(Namespace = "http://govportal.org/")]
+[WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
+[System.Web.Script.Services.ScriptService] // Needed for AJAX
+public class SessionService : System.Web.Services.WebService
+{
+    [WebMethod(EnableSession = true)]
+    public void UpdateLastActive()
+    {
+        string empId = (string)Session["emp_id"];
+        string sessionId = (string)Session["session_id"];
+
+        if (!string.IsNullOrEmpty(empId) && !string.IsNullOrEmpty(sessionId))
+        {
+            using (MySqlConnection conn = new MySqlConnection(ConfigurationManager.ConnectionStrings["YourConnStr"].ConnectionString))
+            {
+                conn.Open();
+                string sql = @"UPDATE UserSessions 
+                               SET LastActiveTime = @LastActiveTime 
+                               WHERE EmpId = @EmpId AND SessionId = @SessionId";
+                using (MySqlCommand cmd = new MySqlCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@EmpId", empId);
+                    cmd.Parameters.AddWithValue("@SessionId", sessionId);
+                    cmd.Parameters.AddWithValue("@LastActiveTime", DateTime.Now);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+    }
+}
+
+home.aspx:
+setInterval(function () {
+    $.ajax({
+        type: "POST",
+        url: "SessionService.asmx/UpdateLastActive",
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        data: "{}",
+        success: function () {
+            console.log("Updated at " + new Date().toLocaleTimeString());
+        },
+        error: function (xhr) {
+            console.error("Error:", xhr.responseText);
+        }
+    });
+}, 30000);
+
+webconfig:
+<system.web>
+  <sessionState mode="InProc" cookieless="false" timeout="20" />
+</system.web>
+<system.web>
+  <authentication mode="None" />
+  <authorization>
+    <allow users="*" />
+  </authorization>
+</system.web>
+
+
